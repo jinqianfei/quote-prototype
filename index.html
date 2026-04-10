@@ -1,0 +1,2630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI智能助手 - 集成报价助手</title>
+    <style>
+        /* 移动端响应式 */
+        @media (max-width: 768px) {
+            body {
+                height: auto;
+                min-height: 100vh;
+            }
+            .app-container {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+            }
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                top: 0;
+                bottom: 0;
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+            .sidebar.show {
+                left: 0;
+            }
+            .sidebar-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+                display: none;
+            }
+            .sidebar-overlay.show {
+                display: block;
+            }
+            .main-content {
+                width: 100%;
+                min-height: 100vh;
+            }
+            .header-menu-btn {
+                display: flex !important;
+                align-items: center;
+                justify-content: center;
+            }
+            .message-area {
+                padding: 16px;
+            }
+            .message {
+                max-width: 90%;
+            }
+            .quote-document {
+                max-width: 100%;
+            }
+            /* 隐藏桌面端特有元素 */
+            .sidebar-header .sidebar-collapse-btn,
+            .sidebar-new-chat,
+            .history-search {
+                display: none;
+            }
+            /* 简化侧边栏 */
+            .sidebar-header {
+                padding: 12px 16px;
+            }
+            .sidebar-quick-btn {
+                margin: 0 16px 8px;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #eef1f5;
+            color: #333;
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* ============ 侧边栏 ============ */
+        .sidebar {
+            width: 260px;
+            background: #1a1d21;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .sidebar.collapsed {
+            width: 60px;
+        }
+
+        .sidebar.collapsed .sidebar-text,
+        .sidebar.collapsed .history-title,
+        .sidebar.collapsed .history-items,
+        .sidebar.collapsed .user-center-info,
+        .sidebar.collapsed .user-dropdown-menu {
+            display: none;
+        }
+
+        .sidebar.collapsed .user-center {
+            justify-content: center;
+            padding: 12px 0;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            padding: 16px 16px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            gap: 10px;
+            min-height: 60px;
+        }
+
+        .sidebar-logo {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-title {
+            font-size: 15px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .sidebar-collapse-btn {
+            position: absolute;
+            right: 12px;
+            top: 18px;
+            width: 24px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .sidebar-collapse-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .sidebar-new-chat {
+            padding: 10px 16px;
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .new-chat-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .new-chat-btn .icon {
+            flex-shrink: 0;
+        }
+
+        .sidebar-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 8px;
+        }
+
+        .sidebar-history::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sidebar-history::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        .history-search {
+            padding: 4px 8px 8px;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 6px 28px 6px 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: white;
+            font-size: 12px;
+        }
+
+        .search-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 8px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            font-size: 10px;
+            display: none;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .history-item {
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .history-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .history-item.active {
+            background: rgba(102, 126, 234, 0.25);
+        }
+
+        .history-item .icon {
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .history-item-content {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .history-item-title {
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .history-item-meta {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            white-space: nowrap;
+        }
+
+        .history-item-pin {
+            font-size: 10px;
+            color: #ffd700;
+            flex-shrink: 0;
+        }
+
+        .history-item-menu {
+            position: absolute;
+            right: 4px;
+            top: 4px;
+            width: 20px;
+            height: 20px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            font-size: 14px;
+            display: none;
+            border-radius: 4px;
+        }
+
+        .history-item:hover .history-item-menu {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .history-item-menu:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .user-center {
+            padding: 12px 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.15s;
+            position: relative;
+        }
+
+        .user-center:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .user-center-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .user-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-tenant {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-dropdown-arrow {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            flex-shrink: 0;
+        }
+
+        .user-dropdown-menu {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            background: #2a2d31;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 4px;
+            overflow: hidden;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .user-dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 10px 14px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.15s;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .dropdown-item.danger {
+            color: #f56c6c;
+        }
+
+        /* ============ 主内容区 ============ */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #eef1f5;
+            min-width: 0;
+        }
+
+        .content-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            height: 52px;
+            background: white;
+            border-bottom: 1px solid #e4e7eb;
+            flex-shrink: 0;
+        }
+
+        .content-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+
+        .content-title:hover {
+            background: #f5f7fa;
+        }
+
+        .content-title-icon {
+            margin-left: 4px;
+            color: #999;
+            font-size: 12px;
+        }
+
+        .header-menu-btn {
+            display: none;
+            width: 36px;
+            height: 36px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #333;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-right: 8px;
+        }
+
+        .header-menu-btn:hover {
+            background: #f5f7fa;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-user-avatar {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* ============ 消息区域 ============ */
+        .message-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .message-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .message-area::-webkit-scrollbar-thumb {
+            background: #d0d3da;
+            border-radius: 3px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+            margin-left: auto;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .message-avatar.user {
+            background: #e4e7eb;
+            color: #888;
+        }
+
+        .message-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #aaa;
+            margin-bottom: 4px;
+            padding: 0 4px;
+        }
+
+        .message.user .message-time {
+            text-align: right;
+        }
+
+        .message-content {
+            background: white;
+            border-radius: 12px;
+            padding: 12px 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            font-size: 14px;
+            line-height: 1.7;
+            color: #333;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+            padding: 0 4px;
+        }
+
+        .message.user .message-actions {
+            justify-content: flex-end;
+        }
+
+        .msg-action-btn {
+            width: 24px;
+            height: 24px;
+            background: none;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 13px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+        }
+
+        .msg-action-btn:hover {
+            background: #f5f7fa;
+            color: #666;
+        }
+
+        .message.user .msg-action-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
+        /* ============ 思考状态 ============ */
+        .thinking-indicator {
+            display: flex;
+            gap: 12px;
+            max-width: 800px;
+            width: 100%;
+            animation: slideIn 0.3s ease;
+        }
+
+        .thinking-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .thinking-content {
+            background: white;
+            border-radius: 12px;
+            padding: 12px 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .thinking-dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .thinking-dots span {
+            width: 6px;
+            height: 6px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .thinking-dots span:nth-child(1) { animation-delay: 0s; }
+        .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        .thinking-text {
+            font-size: 13px;
+            color: #999;
+        }
+
+        /* ============ 欢迎页 ============ */
+        .welcome-page {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 24px;
+            text-align: center;
+        }
+
+        .welcome-avatar-large {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+        }
+
+        .welcome-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .welcome-subtitle {
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 32px;
+        }
+
+        .welcome-tools {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .welcome-tool-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+            border: 1px solid #eee;
+        }
+
+        .welcome-tool-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            border-color: #667eea;
+        }
+
+        .welcome-tool-icon {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .welcome-tool-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .welcome-tool-desc {
+            font-size: 12px;
+            color: #999;
+            line-height: 1.5;
+        }
+
+        .welcome-tool-card.highlight {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .welcome-tool-card.highlight .welcome-tool-title {
+            color: #667eea;
+        }
+
+        /* ============ 报价助手欢迎卡片 ============ */
+        .quote-welcome-card {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 560px;
+            width: 100%;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e4e7eb;
+            text-align: center;
+        }
+
+        .quote-welcome-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            margin: 0 auto 16px;
+        }
+
+        .quote-welcome-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .quote-welcome-subtitle {
+            font-size: 13px;
+            color: #999;
+            margin-bottom: 20px;
+        }
+
+        .quote-welcome-features {
+            text-align: left;
+            background: #f9fafc;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+
+        .quote-welcome-features li {
+            font-size: 13px;
+            color: #555;
+            line-height: 2;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quote-welcome-features li::before {
+            content: '✓';
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .quote-welcome-tip {
+            font-size: 12px;
+            color: #aaa;
+            font-style: italic;
+        }
+
+        /* ============ 文件解析卡片 ============ */
+        .card {
+            background: white;
+            border: 1px solid #e4e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 16px;
+        }
+
+        .card-section {
+            margin-bottom: 16px;
+        }
+
+        .card-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .metric-item {
+            background: #f9fafc;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .metric-value.blue {
+            color: #667eea;
+        }
+
+        .metric-value.green {
+            color: #28a745;
+        }
+
+        /* ============ 配送时效分布表格 ============ */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .table th {
+            background: #f5f7fa;
+            padding: 8px 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid #e4e7eb;
+        }
+
+        .table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #555;
+        }
+
+        .table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table tr:hover td {
+            background: #f9fafc;
+        }
+
+        /* ============ 意图横幅 ============ */
+        .intent-banner {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ============ 参数列表 ============ */
+        .params-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .param-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .param-num {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .param-body {
+            flex: 1;
+        }
+
+        .param-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .param-hint {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 1px;
+        }
+
+        /* ============ 自然语言解析 ============ */
+        .nlp-parsed-card {
+            background: #f0f4ff;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 10px;
+            padding: 14px;
+            margin: 8px 0;
+        }
+
+        .nlp-parsed-header {
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #667eea;
+        }
+
+        .nlp-parsed-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+            font-size: 12px;
+        }
+
+        .nlp-parsed-item:last-child {
+            border-bottom: none;
+        }
+
+        .nlp-parsed-label {
+            color: #666;
+        }
+
+        .nlp-parsed-value {
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* ============ 调整警告 ============ */
+        .adjust-warning {
+            background: #fff8e6;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: #856404;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .adjust-warning.danger {
+            background: #fff0f0;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        /* ============ 按钮 ============ */
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+        }
+
+        .btn-secondary {
+            background: #f5f7fa;
+            color: #555;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #e8ecf1;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* ============ 报价单 ============ */
+        .quote-document {
+            max-width: 800px;
+            background: white;
+            padding: 20px;
+            border: 1px solid #e4e7eb;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+        }
+
+        .quote-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .quote-number {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .quote-company {
+            font-size: 14px;
+            font-weight: 600;
+            text-align: right;
+            color: #333;
+        }
+
+        .quote-section {
+            margin-bottom: 16px;
+        }
+
+        .quote-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #eee;
+            color: #333;
+        }
+
+        .quote-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 12px;
+        }
+
+        .quote-row-label {
+            color: #666;
+        }
+
+        .quote-row-value {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .quote-row-value.highlight {
+            color: #d32f2f;
+            font-weight: 600;
+        }
+
+        .quote-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            padding-top: 14px;
+            border-top: 1px solid #eee;
+            margin-top: 8px;
+        }
+
+        .btn-action {
+            padding: 8px 18px;
+            border: 1px solid #ddd;
+            background: white;
+            color: #333;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-action:hover {
+            background: #f5f7fa;
+            border-color: #bbb;
+        }
+
+        .btn-action-primary {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .btn-action-primary:hover {
+            background: #5a71d9;
+        }
+
+        /* ============ 输入栏 ============ */
+        /* ============ @智能报价 按钮行 ============ */
+        .input-bar-at-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 24px 6px;
+        }
+
+        .at-btn {
+            padding: 4px 12px;
+            border: 1px solid rgba(102, 126, 234, 0.4);
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 6px;
+            color: #667eea;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .at-btn:hover {
+            background: rgba(102, 126, 234, 0.2);
+            border-color: rgba(102, 126, 234, 0.6);
+        }
+
+        .voice-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #d0d3da;
+            background: white;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .voice-btn:hover {
+            background: #f0f2f5;
+            border-color: #667eea;
+        }
+
+        .voice-btn.recording {
+            background: #fef0f0;
+            border-color: #f56c6c;
+            color: #f56c6c;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .file-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #d0d3da;
+            background: white;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            padding: 0;
+            transition: all 0.2s;
+        }
+
+        .file-btn:hover {
+            background: #f0f2f5;
+            border-color: #667eea;
+        }
+
+        .input-bar {
+            padding: 10px 24px 16px;
+            background: #eef1f5;
+            flex-shrink: 0;
+        }
+
+        .input-bar-wrapper {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* 输入框行 */
+        .input-bar-input-row {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .textarea-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .input-textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #d0d3da;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: none;
+            min-height: 36px;
+            max-height: 120px;
+            background: white;
+            line-height: 1.5;
+        }
+
+        .input-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-textarea::placeholder {
+            color: #bbb;
+        }
+
+        .char-count {
+            position: absolute;
+            right: 10px;
+            bottom: 8px;
+            font-size: 11px;
+            color: #bbb;
+        }
+
+        .input-bar-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #d0d3da;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .input-bar-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .send-btn {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* ============ 侧边栏快捷按钮 ============ */
+        .sidebar-quick-btn {
+            margin: 0 16px 8px;
+        }
+
+        .quick-btn {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid rgba(102, 126, 234, 0.25);
+            border-radius: 8px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:hover {
+            background: rgba(102, 126, 234, 0.25);
+            color: white;
+        }
+
+        .quick-btn .icon {
+            font-size: 14px;
+        }
+
+        /* ============ 折叠面板 ============ */
+        .hidden {
+            display: none !important;
+        }
+
+        /* ============ 用户消息 ============ */
+        .message-bubble-file {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        /* ============ 响应式 ============ */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+
+            .welcome-tools {
+                grid-template-columns: 1fr;
+            }
+
+            .quote-document,
+            .quote-welcome-card {
+                margin: 0 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏遮罩（移动端） -->
+        <div class="sidebar-overlay"></div>
+        <!-- ============ 侧边栏 ============ -->
+        <div class="sidebar" id="sidebar">
+            <!-- 系统标识区 -->
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🐆</div>
+                <div class="sidebar-text">
+                    <div class="sidebar-title">AI智能助手</div>
+                </div>
+                <button class="sidebar-collapse-btn" id="collapseBtn" onclick="toggleSidebar()">◀</button>
+            </div>
+
+            <!-- 新建会话 -->
+            <div class="sidebar-new-chat">
+                <button class="new-chat-btn" onclick="newConversation()">
+                    <span class="icon">+</span>
+                    <span class="sidebar-text">新建会话</span>
+                </button>
+            </div>
+
+            <!-- 快捷功能按钮 -->
+            <div class="sidebar-quick-btn">
+                <button class="quick-btn" onclick="startQuoteAssistant()">
+                    <span class="icon">📊</span>
+                    <span class="sidebar-text">智能报价</span>
+                </button>
+            </div>
+
+            <!-- 历史会话列表 -->
+            <div class="sidebar-history">
+                <div class="history-search">
+                    <div class="search-input-wrapper">
+                        <input type="text" class="search-input" id="historySearchInput" placeholder="搜索历史会话..." oninput="filterHistory()">
+                        <button class="search-clear" id="searchClear" onclick="clearSearch()">×</button>
+                    </div>
+                </div>
+                <div class="history-list" id="historyList"></div>
+            </div>
+
+            <!-- 用户中心 -->
+            <div class="user-center" id="userCenter" onclick="toggleUserDropdown()">
+                <div class="user-avatar">Y</div>
+                <div class="user-center-info">
+                    <div class="user-name">演示用户</div>
+                    <div class="user-tenant">华鼎供应链</div>
+                </div>
+                <div class="user-dropdown-arrow sidebar-text">▼</div>
+
+                <div class="user-dropdown-menu" id="userDropdownMenu">
+                    <div class="dropdown-item" onclick="event.stopPropagation(); openProfile()">👤 个人资料修改</div>
+                    <div class="dropdown-item" onclick="event.stopPropagation(); openMembers()">👥 成员管理</div>
+                    <div class="dropdown-item danger" onclick="event.stopPropagation(); logout()">🚪 退出登录</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ 主内容区 ============ -->
+        <div class="main-content">
+            <!-- 内容区头部 -->
+            <div class="content-header">
+                <button class="header-menu-btn" onclick="toggleSidebar()">☰</button>
+                <div class="content-title" id="conversationTitle" onclick="renameConversation()">
+                    新建会话
+                    <span class="content-title-icon">✏️</span>
+                </div>
+                <div class="header-right">
+                    <div class="header-user-avatar" onclick="toggleUserDropdown()">Y</div>
+                </div>
+            </div>
+
+            <!-- 消息容器 -->
+            <div class="message-container" id="messageContainer">
+                <!-- 隐藏的文件上传input -->
+                <input type="file" id="fileInputMain" style="display: none;" accept=".xlsx,.xls,.pdf" onchange="handleFileUpload(event)">
+                <!-- 欢迎页 -->
+                <div class="welcome-page" id="welcomePage">
+                    <div class="welcome-avatar-large">🐆</div>
+                    <div class="welcome-title">你好，我是AI智能助手</div>
+                    <div class="welcome-subtitle">有什么我可以帮助您的？</div>
+
+                </div>
+
+                <!-- 消息区域 -->
+                <div class="message-area hidden" id="messageArea"></div>
+
+                <!-- 思考状态 -->
+                <div class="thinking-indicator hidden" id="thinkingIndicator">
+                    <div class="thinking-avatar">🐆</div>
+                    <div class="thinking-content">
+                        <div class="thinking-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <div class="thinking-text">正在思考...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- @智能报价 按钮（输入框上方） -->
+            <div class="input-bar-at-row">
+                <button class="at-btn" onclick="startQuoteAssistant()">@智能报价</button>
+            </div>
+
+            <!-- 输入栏 -->
+            <div class="input-bar">
+                <div class="input-bar-wrapper">
+                    <div class="input-bar-input-row">
+                        <div class="textarea-wrapper">
+                            <textarea class="input-textarea" id="inputText" placeholder="输入您的问题，或上传门店文件开始报价..." onkeydown="handleKeyDown(event)" oninput="updateCharCount()"></textarea>
+                            <div class="char-count" id="charCount">至多500字</div>
+                        </div>
+                        <label class="file-btn" title="上传附件">
+                            <input type="file" id="fileInput" style="display:none" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(event)">
+                            <span>📎</span>
+                        </label>
+                        <button class="voice-btn" title="语音输入" onclick="toggleVoice()">⏹</button>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============ 状态管理 ============
+        let currentConversationId = null;
+        let conversationTitle = '新建会话';
+        let adjustCount = 0;
+        let parsedParams = {};
+        let pendingFileName = '';
+        let isQuoteMode = false;
+        const MAX_ADJUST = 3;
+
+        // ============ 消息操作函数 ============
+        function copyMessage(btn) {
+            const content = btn.closest('.message-body').querySelector('.message-content').innerText;
+            navigator.clipboard.writeText(content).then(() => {
+                btn.title = '已复制!';
+                setTimeout(() => btn.title = '复制', 1500);
+            });
+        }
+
+        function regenerateMessage() {
+            alert('重新生成功能开发中...');
+        }
+
+        function messageFeedback(btn, isHelpful) {
+            btn.title = isHelpful ? '已反馈' : '已反馈';
+            setTimeout(() => btn.title = isHelpful ? '有帮助' : '没帮助', 1500);
+        }
+
+        // ============ 历史会话数据 ============
+        const historyData = [
+            { id: 'conv1', title: '北京XX客户报价方案', time: '今天 14:32', pin: true },
+            { id: 'conv2', title: '上海YY客户报价方案', time: '昨天 10:15', pin: false },
+            { id: 'conv3', title: '关于物流成本的咨询', time: '3月27日', pin: false },
+            { id: 'conv4', title: '仓储管理制度撰写', time: '3月25日', pin: false }
+        ];
+
+        // ============ 侧边栏折叠 ============
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            // 移动端使用抽屉式侧边栏
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('show');
+                if (overlay) overlay.classList.toggle('show');
+            } else {
+                const btn = document.getElementById('collapseBtn');
+                sidebar.classList.toggle('collapsed');
+                if (sidebar.classList.contains('collapsed')) {
+                    btn.textContent = '▶';
+                } else {
+                    btn.textContent = '◀';
+                }
+                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            }
+        }
+
+        // 移动端点击遮罩关闭侧边栏
+        document.addEventListener('DOMContentLoaded', function() {
+            const overlay = document.querySelector('.sidebar-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', toggleSidebar);
+            }
+        });
+
+        // ============ 历史会话列表 ============
+        function renderHistoryList(filter = '') {
+            const list = document.getElementById('historyList');
+            let filtered = historyData;
+            if (filter) {
+                filtered = historyData.filter(h => h.title.includes(filter));
+            }
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<div style="padding: 12px 10px; font-size: 12px; color: rgba(255,255,255,0.4);">未找到相关对话</div>';
+                return;
+            }
+
+            list.innerHTML = filtered.map(h => `
+                <div class="history-item ${h.id === currentConversationId ? 'active' : ''}" onclick="loadConversation('${h.id}')">
+                    <span class="icon">💬</span>
+                    <div class="history-item-content">
+                        <div class="history-item-title">${h.title}</div>
+                        <div class="history-item-meta">${h.time}</div>
+                    </div>
+                    ${h.pin ? '<span class="history-item-pin">📌</span>' : ''}
+                    <button class="history-item-menu" onclick="event.stopPropagation(); showHistoryMenu('${h.id}')">⋮</button>
+                </div>
+            `).join('');
+        }
+
+        function filterHistory() {
+            const val = document.getElementById('historySearchInput').value;
+            document.getElementById('searchClear').style.display = val ? 'flex' : 'none';
+            renderHistoryList(val);
+        }
+
+        function clearSearch() {
+            document.getElementById('historySearchInput').value = '';
+            document.getElementById('searchClear').style.display = 'none';
+            renderHistoryList();
+        }
+
+        // ============ 新建会话 ============
+        function newConversation() {
+            currentConversationId = 'conv_' + Date.now();
+            conversationTitle = '新建会话';
+            document.getElementById('conversationTitle').textContent = '新建会话';
+            isQuoteMode = false;
+            adjustCount = 0;
+            parsedParams = {};
+            document.getElementById('welcomePage').classList.remove('hidden');
+            document.getElementById('messageArea').classList.add('hidden');
+            document.getElementById('messageArea').innerHTML = '';
+            renderHistoryList();
+        }
+
+        function loadConversation(id) {
+            currentConversationId = id;
+            const conv = historyData.find(h => h.id === id);
+            if (conv) {
+                conversationTitle = conv.title;
+                document.getElementById('conversationTitle').textContent = conv.title;
+            }
+            document.getElementById('welcomePage').classList.add('hidden');
+            document.getElementById('messageArea').classList.remove('hidden');
+            renderHistoryList();
+        }
+
+        function renameConversation() {
+            const newTitle = prompt('请输入新的会话标题：', conversationTitle);
+            if (newTitle && newTitle.trim()) {
+                conversationTitle = newTitle.trim().substring(0, 30);
+                document.getElementById('conversationTitle').textContent = conversationTitle;
+                // 更新历史记录标题
+                const conv = historyData.find(h => h.id === currentConversationId);
+                if (conv) conv.title = conversationTitle;
+                renderHistoryList();
+            }
+        }
+
+        // ============ 用户中心下拉 ============
+        function toggleUserDropdown() {
+            const dropdown = document.getElementById('userDropdownMenu');
+            dropdown.classList.toggle('show');
+            event.stopPropagation();
+        }
+
+        document.addEventListener('click', () => {
+            document.getElementById('userDropdownMenu').classList.remove('show');
+        });
+
+        function openProfile() {
+            alert('个人资料修改弹窗');
+        }
+
+        function openMembers() {
+            alert('成员管理弹窗');
+        }
+
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                alert('退出登录');
+            }
+        }
+
+        // ============ 启动报价助手 ============
+        function startQuoteAssistant() {
+            isQuoteMode = true;
+            currentConversationId = 'conv_quote_' + Date.now();
+            conversationTitle = '智能报价';
+            document.getElementById('conversationTitle').textContent = '智能报价';
+            document.getElementById('welcomePage').classList.add('hidden');
+            document.getElementById('messageArea').classList.remove('hidden');
+            document.getElementById('messageArea').innerHTML = '';
+            addBotMessage(`
+                <div class="quote-welcome-card">
+                    <div class="quote-welcome-icon">📊</div>
+                    <div class="quote-welcome-title">📊 智能报价</div>
+                    <div class="quote-welcome-subtitle">让报价随需求而生</div>
+                    <div style="background:#f9fafc;border-radius:10px;padding:16px 20px;margin-bottom:20px;text-align:left;">
+                        <div style="font-size:14px;color:#333;margin-bottom:10px;">欢迎使用智能报价助手！<br>告诉我您的客户情况，我可以帮您：</div>
+                        <ul class="quote-welcome-features" style="margin-bottom:0;">
+                            <li>✓ 解析门店分布，智能识别省份城市</li>
+                            <li>✓ 生成最优仓配方案，降低物流成本</li>
+                            <li>✓ 自动计算报价，生成完整报价单</li>
+                        </ul>
+                    </div>
+                    <div style="font-size:13px;color:#888;margin-bottom:16px;">您可以输入文字描述需求，或直接上传门店文件~</div>
+                        <div>
+                        <label class="btn btn-primary" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                            <span>📎</span> 上传门店文件
+                            <input type="file" style="display:none;" accept=".xlsx,.xls,.pdf" onchange="handleFileUpload(event)">
+                        </label>
+                    </div>
+                </div>
+            `, false);
+        }
+
+        // ============ 快捷工具启动聊天 ============
+        function startChat(text) {
+            document.getElementById('inputText').value = text;
+            sendMessage();
+        }
+
+        // ============ 语音输入 ============
+        function toggleVoice() {
+            const btn = document.querySelector('.voice-btn');
+            if (btn.classList.contains('recording')) {
+                btn.classList.remove('recording');
+                btn.title = '语音输入';
+            } else {
+                btn.classList.add('recording');
+                btn.title = '录音中... 点击停止';
+            }
+        }
+
+        // ============ 字数统计 ============
+        function updateCharCount() {
+            const input = document.getElementById('inputText');
+            const count = input.value.length;
+            const countEl = document.getElementById('charCount');
+            if (count > 0) {
+                countEl.textContent = `${count}/500`;
+                countEl.style.color = count > 450 ? '#f56c6c' : '#bbb';
+            } else {
+                countEl.textContent = '至多500字';
+                countEl.style.color = '#bbb';
+            }
+        }
+
+        // ============ 消息渲染 ============
+        function getTimeString() {
+            const now = new Date();
+            return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function addUserMessage(content, isFile = false) {
+            const area = document.getElementById('messageArea');
+            const time = getTimeString();
+
+            if (isFile) {
+                area.insertAdjacentHTML('beforeend', `
+                    <div class="message user">
+                        <div class="message-body">
+                            <div class="message-time">${time}</div>
+                            <div class="message-content">
+                                <div class="message-bubble-file">📎 ${content}</div>
+                            </div>
+                            <div class="message-actions">
+                                <button class="msg-action-btn" title="复制" onclick="copyMessage(this)">📋</button>
+                            </div>
+                        </div>
+                        <div class="message-avatar user">Y</div>
+                    </div>
+                `);
+            } else {
+                area.insertAdjacentHTML('beforeend', `
+                    <div class="message user">
+                        <div class="message-body">
+                            <div class="message-time">${time}</div>
+                            <div class="message-content">${content}</div>
+                            <div class="message-actions">
+                                <button class="msg-action-btn" title="复制" onclick="copyMessage(this)">📋</button>
+                            </div>
+                        </div>
+                        <div class="message-avatar user">Y</div>
+                    </div>
+                `);
+            }
+            area.scrollTop = area.scrollHeight;
+        }
+
+        function addBotMessage(content, withActions = true) {
+            const area = document.getElementById('messageArea');
+            const time = getTimeString();
+            const actions = withActions ? `
+                <div class="message-actions">
+                    <button class="msg-action-btn" title="复制" onclick="copyMessage(this)">📋</button>
+                    <button class="msg-action-btn" title="重新生成" onclick="regenerateMessage()">🔄</button>
+                    <button class="msg-action-btn" title="有帮助" onclick="messageFeedback(this, true)">👍</button>
+                    <button class="msg-action-btn" title="没帮助" onclick="messageFeedback(this, false)">👎</button>
+                </div>
+            ` : '';
+
+            area.insertAdjacentHTML('beforeend', `
+                <div class="message">
+                    <div class="message-avatar">🐆</div>
+                    <div class="message-body">
+                        <div class="message-time">${time}</div>
+                        <div class="message-content">${content}</div>
+                        ${actions}
+                    </div>
+                </div>
+            `);
+            area.scrollTop = area.scrollHeight;
+        }
+
+        function addCardMessage(htmlContent) {
+            const area = document.getElementById('messageArea');
+            const time = getTimeString();
+
+            area.insertAdjacentHTML('beforeend', `
+                <div class="message">
+                    <div class="message-avatar">🐆</div>
+                    <div class="message-body">
+                        <div class="message-time">${time}</div>
+                        <div class="message-content" style="padding: 0; background: transparent; box-shadow: none;">
+                            ${htmlContent}
+                        </div>
+                        <div class="message-actions">
+                            <button class="msg-action-btn" title="复制" onclick="copyMessage(this)">📋</button>
+                            <button class="msg-action-btn" title="重新生成" onclick="regenerateMessage()">🔄</button>
+                        </div>
+                    </div>
+                </div>
+            `);
+            area.scrollTop = area.scrollHeight;
+        }
+
+        // ============ 思考状态 ============
+        function showThinking() {
+            document.getElementById('thinkingIndicator').classList.remove('hidden');
+            document.getElementById('messageArea').scrollTop = document.getElementById('messageArea').scrollHeight;
+        }
+
+        function hideThinking() {
+            document.getElementById('thinkingIndicator').classList.add('hidden');
+        }
+
+        // ============ 意图识别 ============
+        function handleIntentRecognition(text) {
+            const quoteIntents = ['报价', '做报价', '帮我报价', '给客户报价', '客户报价'];
+            return quoteIntents.some(intent => text.includes(intent));
+        }
+
+        // ============ 自然语言解析 ============
+        function parseNaturalLanguage(text) {
+            const params = {
+                maxTransfer: null,
+                warehouseCount: null,
+                requiredWarehouses: [],
+                excludedWarehouses: [],
+                forcedRoutes: [],
+                deliveryTime: null,
+                specialNeeds: null
+            };
+
+            const transferMatch = text.match(/(\d+)\s*[次层]?\s*调拨/);
+            if (transferMatch) params.maxTransfer = parseInt(transferMatch[1]);
+
+            const warehouseMatch = text.match(/(\d+)\s*[个]?\s*仓/);
+            if (warehouseMatch) params.warehouseCount = parseInt(warehouseMatch[1]);
+
+            const requiredMatches = text.match(/([^调拨件\s]+)仓/g);
+            if (requiredMatches) {
+                params.requiredWarehouses = requiredMatches
+                    .map(m => m.replace('仓', ''))
+                    .filter(w => !text.includes('调拨' + w) && !text.includes('不用' + w));
+            }
+
+            const excludeMatches = text.match(/不用[\s]?([^调拨件]+)仓|不能用[\s]?([^调拨件]+)仓/g);
+            if (excludeMatches) {
+                params.excludedWarehouses = excludeMatches.map(m => m.replace(/[不用能]+/g, '').replace('仓', ''));
+            }
+
+            const routeMatch = text.match(/(.+?)仓供货给(.+?)仓/g);
+            if (routeMatch) {
+                params.forcedRoutes = routeMatch.map(m => {
+                    const parts = m.replace('仓供货给', '仓').split('仓供货给');
+                    return { from: parts[0], to: parts[1] };
+                });
+            }
+
+            const timeMatch = text.match(/(\d+)\s*天.*达|次日达|当日达|隔日达/g);
+            if (timeMatch) params.deliveryTime = text.match(/(\d+)\s*天/)?.[1] || '次';
+
+            if (text.includes('冷链')) params.specialNeeds = '冷链';
+            if (text.includes('优先')) params.specialNeeds = '优先配送';
+
+            return params;
+        }
+
+        function showParsedParams(params) {
+            let hasParsed = false;
+            let html = '<div class="nlp-parsed-card">';
+            html += '<div class="nlp-parsed-header">🧠 我理解了！自动解析到以下参数：</div>';
+
+            if (params.maxTransfer !== null) {
+                html += `<div class="nlp-parsed-item"><span class="nlp-parsed-label">最大调拨次数</span><span class="nlp-parsed-value">${params.maxTransfer} 次</span></div>`;
+                hasParsed = true;
+            }
+            if (params.warehouseCount !== null) {
+                html += `<div class="nlp-parsed-item"><span class="nlp-parsed-label">存储仓数量</span><span class="nlp-parsed-value">${params.warehouseCount} 个</span></div>`;
+                hasParsed = true;
+            }
+            if (params.requiredWarehouses.length > 0) {
+                html += `<div class="nlp-parsed-item"><span class="nlp-parsed-label">必须使用的仓库</span><span class="nlp-parsed-value">${params.requiredWarehouses.join('、')}仓</span></div>`;
+                hasParsed = true;
+            }
+            if (params.excludedWarehouses.length > 0) {
+                html += `<div class="nlp-parsed-item"><span class="nlp-parsed-label">不能使用的仓库</span><span class="nlp-parsed-value">${params.excludedWarehouses.join('、')}仓</span></div>`;
+                hasParsed = true;
+            }
+            if (params.forcedRoutes.length > 0) {
+                html += `<div class="nlp-parsed-item"><span class="nlp-parsed-label">强制调拨关系</span><span class="nlp-parsed-value">${params.forcedRoutes.map(r => r.from + '仓→' + r.to + '仓').join('、')}</span></div>`;
+                hasParsed = true;
+            }
+            if (params.deliveryTime) {
+                html += `<div class="nlp-parsed-item"><span class="nlp-parsed-label">配送时效要求</span><span class="nlp-parsed-value">${params.deliveryTime === '次' ? '次日达' : params.deliveryTime + '天达'}</span></div>`;
+                hasParsed = true;
+            }
+            if (params.specialNeeds) {
+                html += `<div class="nlp-parsed-item"><span class="nlp-parsed-label">特殊需求</span><span class="nlp-parsed-value">${params.specialNeeds}</span></div>`;
+                hasParsed = true;
+            }
+
+            html += '</div>';
+            return hasParsed ? html : '';
+        }
+
+        // ============ 文件上传处理 ============
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            pendingFileName = file.name;
+            isQuoteMode = true;
+
+            // 隐藏欢迎页
+            document.getElementById('welcomePage').classList.add('hidden');
+            document.getElementById('messageArea').classList.remove('hidden');
+
+            // 显示用户上传消息
+            addUserMessage(file.name, true);
+
+            // 显示文件解析
+            showThinking();
+            setTimeout(() => {
+                hideThinking();
+                addCardMessage(`
+                    <div class="card">
+                        <div class="card-title">✅ 文件解析完成</div>
+                        <div class="card-subtitle">已成功解析客户数据</div>
+                        <div class="card-section">
+                            <div style="font-size: 13px; color: #555; margin-bottom: 12px;">这是一份覆盖以下信息的客户数据，对吗？</div>
+                            <div class="metrics">
+                                <div class="metric-item">
+                                    <div class="metric-label">覆盖城市</div>
+                                    <div class="metric-value blue">3</div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-label">总门店数</div>
+                                    <div class="metric-value blue">85</div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-label">覆盖省份</div>
+                                    <div class="metric-value blue">2</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-section">
+                            <div style="font-size: 12px; color: #666;">
+                                <strong>省份分布：</strong><br>
+                                河南省：3个城市，45家门店<br>
+                                山东省：2个城市，40家门店
+                            </div>
+                        </div>
+                    </div>
+                `);
+
+                // 引导用户输入优化参数
+                setTimeout(() => {
+                    showParamInputStep();
+                }, 500);
+            }, 1000);
+
+            event.target.value = '';
+        }
+
+        function triggerFileUpload() {
+            document.getElementById('fileInput').click();
+        }
+
+        // ============ 参数输入步骤 ============
+        function showParamInputStep() {
+            addBotMessage(`
+                <div class="card">
+                    <div class="card-title">⚙️ 设置优化参数</div>
+                    <div class="card-subtitle">请描述您的优化需求（支持自然语言一次性描述，或逐项填写）</div>
+
+                    <div style="background:#f9fafc;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+                        <div style="font-size:13px;color:#555;margin-bottom:12px;">💡 填写说明：支持一次性描述，如"2次调拨、3个仓、必须用郑州仓"</div>
+                        <div class="params-list">
+                            <div class="param-item">
+                                <div class="param-num">1</div>
+                                <div class="param-body">
+                                    <div class="param-label">最大调拨次数</div>
+                                    <div class="param-hint">干线中转越仓最多几次，如：2次</div>
+                                </div>
+                            </div>
+                            <div class="param-item">
+                                <div class="param-num">2</div>
+                                <div class="param-body">
+                                    <div class="param-label">存储仓数量</div>
+                                    <div class="param-hint">希望设置几个存储仓，如：5个</div>
+                                </div>
+                            </div>
+                            <div class="param-item">
+                                <div class="param-num">3</div>
+                                <div class="param-body">
+                                    <div class="param-label">必须使用的仓库</div>
+                                    <div class="param-hint">客户已有或优先仓库，如：必须用郑州仓</div>
+                                </div>
+                            </div>
+                            <div class="param-item">
+                                <div class="param-num">4</div>
+                                <div class="param-body">
+                                    <div class="param-label">不能使用的仓库</div>
+                                    <div class="param-hint">排除的仓库，如：不用广州仓</div>
+                                </div>
+                            </div>
+                            <div class="param-item">
+                                <div class="param-num">5</div>
+                                <div class="param-body">
+                                    <div class="param-label">强制调拨关系</div>
+                                    <div class="param-hint">指定仓库间的供货关系，如：郑州仓供货给太原仓</div>
+                                </div>
+                            </div>
+                            <div class="param-item">
+                                <div class="param-num">6</div>
+                                <div class="param-body">
+                                    <div class="param-label">配送时效要求</div>
+                                    <div class="param-hint">客户对时效的要求，如：3天达</div>
+                                </div>
+                            </div>
+                            <div class="param-item">
+                                <div class="param-num">7</div>
+                                <div class="param-body">
+                                    <div class="param-label">特殊需求</div>
+                                    <div class="param-hint">其他个性化需求，如：全程冷链</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:14px;">
+                        <textarea id="paramInput" class="input-textarea" style="width:100%;min-height:72px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;" placeholder="输入您的优化参数，如：2次调拨、3个仓、必须用郑州仓、3天达"></textarea>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="confirmParams()">✓ 确认参数</button>
+                        <button class="btn btn-secondary" onclick="useDefaultParams()">使用默认参数</button>
+                    </div>
+                </div>
+            `, false);
+        }
+
+        function confirmParams() {
+            const paramText = document.getElementById('paramInput').value.trim();
+
+            // 解析用户输入的参数
+            const params = parseNaturalLanguage(paramText);
+            parsedParams = { ...params };
+
+            // 显示解析结果
+            const parsedHtml = showParsedParams(params);
+            if (parsedHtml) {
+                addCardMessage(parsedHtml);
+            }
+
+            // 显示参数汇总确认页
+            setTimeout(() => {
+                showParamSummary(params);
+            }, parsedHtml ? 300 : 100);
+        }
+
+        function useDefaultParams() {
+            addUserMessage('使用默认参数');
+            parsedParams = {
+                maxTransfer: 2,
+                warehouseCount: null,
+                requiredWarehouses: [],
+                excludedWarehouses: [],
+                forcedRoutes: [],
+                deliveryTime: null,
+                specialNeeds: null
+            };
+            setTimeout(() => {
+                showParamSummary(parsedParams);
+            }, 300);
+        }
+
+        // ============ 参数汇总确认页 ============
+        function showParamSummary(params) {
+            const items = [];
+            items.push({ label: '最大调拨次数', value: params.maxTransfer !== null ? params.maxTransfer + ' 次' : '算法自动推荐' });
+            items.push({ label: '存储仓数量', value: params.warehouseCount !== null ? params.warehouseCount + ' 个' : '算法根据门店分布推荐' });
+            items.push({ label: '必须使用的仓库', value: params.requiredWarehouses.length > 0 ? params.requiredWarehouses.map(w => w + '仓').join('、') : '无' });
+            items.push({ label: '不能使用的仓库', value: params.excludedWarehouses.length > 0 ? params.excludedWarehouses.map(w => w + '仓').join('、') : '无' });
+            items.push({ label: '强制调拨关系', value: params.forcedRoutes.length > 0 ? params.forcedRoutes.map(r => r.from + '仓→' + r.to + '仓').join('、') : '无' });
+            items.push({ label: '配送时效要求', value: params.deliveryTime ? (params.deliveryTime === '次' ? '次日达' : params.deliveryTime + '天达') : '无' });
+            items.push({ label: '特殊需求', value: params.specialNeeds || '无' });
+
+            let rows = items.map(item => `
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;">
+                    <span style="color:#888;">${item.label}</span>
+                    <span style="color:#333;font-weight:500;">${item.value}</span>
+                </div>
+            `).join('');
+
+            addBotMessage(`
+                <div class="card">
+                    <div class="card-title">📋 请确认您的优化参数</div>
+                    <div style="margin-bottom:16px;">${rows}</div>
+                    <div style="background:#fffbe6;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#ad6800;">
+                        💡 确认后将调用仓配算法生成方案，同一会话内最多调整3次
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="generateSolution()">✓ 确认，生成方案</button>
+                        <button class="btn btn-secondary" onclick="showParamInputStep()">← 重新编辑</button>
+                    </div>
+                </div>
+            `, false);
+        }
+
+        // ============ 生成仓配方案 ============
+        function generateSolution() {
+            showThinking();
+            setTimeout(() => {
+                hideThinking();
+                addCardMessage(`
+                    <div class="card">
+                        <div class="card-title">⏳ 方案生成中...</div>
+                        <div style="padding: 20px 0; text-align: center;">
+                            <div style="font-size: 24px; margin-bottom: 12px;">⚙️</div>
+                            <div style="color: #666; font-size: 13px;">正在调用仓配算法计算最优方案...</div>
+                        </div>
+                    </div>
+                `);
+
+                setTimeout(() => {
+                    addCardMessage(`
+                        <div class="card">
+                            <div class="card-title">✅ 仓配方案已生成</div>
+
+                            <div class="metrics" style="margin-bottom:16px;">
+                                <div class="metric-item">
+                                    <div class="metric-label">总门店数</div>
+                                    <div class="metric-value blue">42</div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-label">总城市数</div>
+                                    <div class="metric-value blue">3</div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-label">推荐存储仓数</div>
+                                    <div class="metric-value green">4</div>
+                                </div>
+                            </div>
+                            <div class="metrics" style="margin-bottom:16px;">
+                                <div class="metric-item">
+                                    <div class="metric-label">涉及配送基地</div>
+                                    <div class="metric-value blue">2</div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-label">平均配送时效</div>
+                                    <div class="metric-value blue">2.86 天</div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-label">总调拨次数</div>
+                                    <div class="metric-value blue">2</div>
+                                </div>
+                            </div>
+
+                            <div class="card-section">
+                                <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#333;">⏱ 配送时效分布</div>
+                                <table class="table">
+                                    <thead>
+                                        <tr><th>配送时效区间</th><th>对应门店数</th><th>占比</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td>1 天以内</td><td>10</td><td>23.8%</td></tr>
+                                        <tr><td>2 天以内</td><td>4</td><td>9.5%</td></tr>
+                                        <tr><td>3 天以内</td><td>17</td><td>40.5%</td></tr>
+                                        <tr><td>4 天以内</td><td>7</td><td>16.7%</td></tr>
+                                        <tr><td>5 天以内</td><td>1</td><td>2.4%</td></tr>
+                                        <tr><td>6 天以内</td><td>3</td><td>7.1%</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="card-section">
+                                <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#333;">🏬 存储仓配置</div>
+                                <table class="table">
+                                    <thead>
+                                        <tr><th>仓库名称</th><th>服务门店数</th><th>平均配送时效（天）</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td>成都仓</td><td>17</td><td>2.0</td></tr>
+                                        <tr><td>郑州基地</td><td>25</td><td>3.44</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="card-section">
+                                <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#333;">🔗 调拨关系</div>
+                                <table class="table">
+                                    <thead>
+                                        <tr><th>始发仓</th><th>目的仓</th><th>运输类型</th><th>周配次数</th><th>配送日期</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td>郑州基地</td><td>武汉基地</td><td>干线调拨</td><td>3 次</td><td>周一、周三、周五</td></tr>
+                                        <tr><td>郑州基地</td><td>西安基地</td><td>干线调拨</td><td>3 次</td><td>周二、周四、周日</td></tr>
+                                        <tr><td>成都仓</td><td>成都仓</td><td>自仓调拨</td><td>2 次</td><td>无固定日期</td></tr>
+                                        <tr><td>郑州基地</td><td>郑州基地</td><td>自仓调拨</td><td>4 次</td><td>无固定日期</td></tr>
+                                        <tr><td>郑州基地</td><td>长沙基地</td><td>干线调拨</td><td>3 次</td><td>周一、周三、周五</td></tr>
+                                        <tr><td>郑州基地</td><td>南昌基地</td><td>干线调拨</td><td>2 次</td><td>周三、周六</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="btn-group">
+                                <button class="btn btn-primary" onclick="generateQuote()">✓ 确认方案，生成报价</button>
+                                <button class="btn btn-secondary" onclick="adjustConstraints()">⚙️ 调整约束</button>
+                            </div>
+                        </div>
+                    `);
+                }, 2500);
+            }, 800);
+        }
+
+        function adjustConstraints() {
+            // 显示调整提示
+            addCardMessage(`<div class="adjust-warning">⚠️ 调整约束中...</div>`);
+            // 跳转回设置优化参数页面
+            setTimeout(() => showParamInputStep(), 500);
+        }
+
+        // ============ 生成报价单 ============
+        function generateQuote() {
+            showThinking();
+            setTimeout(() => {
+                hideThinking();
+                addCardMessage(`
+                    <div class="card">
+                        <div class="card-title">⏳ 报价单生成中...</div>
+                        <div style="padding: 30px 0; text-align: center;">
+                            <div style="font-size: 24px; margin-bottom: 12px;">📄</div>
+                            <div style="color: #666; font-size: 13px;">正在结合营销价格生成报价单...</div>
+                        </div>
+                    </div>
+                `);
+
+                setTimeout(() => {
+                    const today = new Date();
+                    const validDate = new Date(today);
+                    validDate.setDate(validDate.getDate() + 7);
+                    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    const quoteNo = `HD-${fmt(today).replace(/-/g,'')}-${String(Math.floor(Math.random()*900+100))}`;
+
+                    addCardMessage(`
+                        <div class="quote-document" style="max-width:800px;">
+
+                            <!-- 头部 -->
+                            <div style="text-align:center;padding-bottom:16px;border-bottom:2px solid #667eea;margin-bottom:20px;">
+                                <div style="font-size:22px;font-weight:700;color:#333;letter-spacing:2px;">华鼎供应链 · 仓配报价单</div>
+                            </div>
+
+                            <!-- 基础信息 -->
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px;margin-bottom:20px;">
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <span style="font-size:13px;color:#888;white-space:nowrap;">报价单编号</span>
+                                    <span style="font-size:13px;color:#333;font-weight:600;">${quoteNo}</span>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <span style="font-size:13px;color:#888;white-space:nowrap;">报价日期</span>
+                                    <span style="font-size:13px;color:#333;">${fmt(today)}</span>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <span style="font-size:13px;color:#888;white-space:nowrap;">客户名称</span>
+                                    <span style="font-size:13px;color:#333;font-weight:600;">羊庄集团有限公司</span>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <span style="font-size:13px;color:#888;white-space:nowrap;">联系人</span>
+                                    <span style="font-size:13px;color:#333;">张经理  138****1234</span>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <span style="font-size:13px;color:#888;white-space:nowrap;">税率</span>
+                                    <span style="font-size:13px;color:#333;">仓储类 6%  /  运输类 9%</span>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <span style="font-size:13px;color:#888;white-space:nowrap;">付款条件</span>
+                                    <span style="font-size:13px;color:#333;">预付 30%，交付 70%</span>
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <span style="font-size:13px;color:#888;white-space:nowrap;">报价有效期</span>
+                                    <span style="font-size:13px;color:#f56c6c;font-weight:600;">${fmt(validDate)}（有效期 7 天）</span>
+                                </div>
+                            </div>
+
+                            <!-- 存储仓配置 -->
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:14px;font-weight:700;color:#333;border-left:3px solid #667eea;padding-left:8px;margin-bottom:10px;">一、存储仓配置</div>
+                                <table class="table" style="width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>仓库名称</th>
+                                            <th>仓库类型</th>
+                                            <th>覆盖城市</th>
+                                            <th>覆盖门店数</th>
+                                            <th>温控要求</th>
+                                            <th>周转期</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>成都仓</td>
+                                            <td>冷藏冷冻仓</td>
+                                            <td>14 个城市</td>
+                                            <td>17 家</td>
+                                            <td>-15°C ±3°C</td>
+                                            <td>30 天</td>
+                                        </tr>
+                                        <tr>
+                                            <td>郑州基地</td>
+                                            <td>冷藏冷冻仓</td>
+                                            <td>15+ 个城市</td>
+                                            <td>25 家</td>
+                                            <td>-15°C ±3°C</td>
+                                            <td>30 天</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- 仓间调拨 -->
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:14px;font-weight:700;color:#333;border-left:3px solid #667eea;padding-left:8px;margin-bottom:10px;">二、仓间调拨报价</div>
+                                <table class="table" style="width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>调出仓</th>
+                                            <th>调入仓</th>
+                                            <th>调拨周期</th>
+                                            <th>起运量</th>
+                                            <th>单价</th>
+                                            <th>税率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>成都仓</td>
+                                            <td>郑州仓</td>
+                                            <td>一周 1 次</td>
+                                            <td>20 件</td>
+                                            <td>¥8.00 / 件</td>
+                                            <td>9%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- 末端配送 -->
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:14px;font-weight:700;color:#333;border-left:3px solid #667eea;padding-left:8px;margin-bottom:10px;">三、末端配送报价</div>
+                                <table class="table" style="width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>配送仓库</th>
+                                            <th>配送区域</th>
+                                            <th>配送频次</th>
+                                            <th>起运量</th>
+                                            <th>单价</th>
+                                            <th>时效</th>
+                                            <th>税率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>郑州基地</td>
+                                            <td>河南省、山西省区域配送</td>
+                                            <td>一周 3 次（周一、周三、周五）</td>
+                                            <td>15 件</td>
+                                            <td>¥4.00 / 件</td>
+                                            <td>1-2 天</td>
+                                            <td>9%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- 增值服务 -->
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:14px;font-weight:700;color:#333;border-left:3px solid #667eea;padding-left:8px;margin-bottom:10px;">四、增值服务报价</div>
+                                <table class="table" style="width:100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>服务项目</th>
+                                            <th>服务说明</th>
+                                            <th>计费方式</th>
+                                            <th>单价</th>
+                                            <th>税率</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>装卸服务</td>
+                                            <td>货物装卸</td>
+                                            <td>元 / 标准件</td>
+                                            <td>¥0.50</td>
+                                            <td>6%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>入仓服务</td>
+                                            <td>货物入仓</td>
+                                            <td>元 / 标准件</td>
+                                            <td>¥0.50</td>
+                                            <td>6%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>质检服务</td>
+                                            <td>商品质量检查</td>
+                                            <td>元 / 抽检箱数</td>
+                                            <td>¥1.00</td>
+                                            <td>6%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>产品计量称重</td>
+                                            <td>按客户毛重范围称重</td>
+                                            <td>元 / 最小单位</td>
+                                            <td>¥0.50</td>
+                                            <td>6%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>产品测试</td>
+                                            <td>品控人员参照标准品评</td>
+                                            <td>元 / 次（箱）</td>
+                                            <td>¥2.00</td>
+                                            <td>6%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>电子标样核验</td>
+                                            <td>实物与电子标样内容核对</td>
+                                            <td>元 / 箱</td>
+                                            <td>¥0.50</td>
+                                            <td>6%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- 计费规则 -->
+                            <div style="margin-bottom:20px;">
+                                <div style="font-size:14px;font-weight:700;color:#333;border-left:3px solid #667eea;padding-left:8px;margin-bottom:10px;">五、计费规则</div>
+                                <div style="background:#f9fafc;border-radius:8px;padding:14px 16px;font-size:12px;color:#555;line-height:1.9;">
+                                    <div style="margin-bottom:6px;">1. <strong>标准件定义：</strong>12kg/件，0.036m³/件</div>
+                                    <div style="margin-bottom:6px;">2. <strong>计费件数：</strong>实际箱规 / 标准件箱规（四舍五入，重量和体积取大值）</div>
+                                    <div style="margin-bottom:6px;">3. <strong>最低收费：</strong>不满起运量按起运量 / 最低收费计费</div>
+                                    <div>4. <strong>冷链温控：</strong>全程冷链，温度 -15°C ±3°C</div>
+                                </div>
+                            </div>
+
+                            <!-- 操作按钮 -->
+                            <div style="display:flex;gap:12px;justify-content:center;padding-top:16px;border-top:1px solid #eee;">
+                                <button class="btn-action" onclick="exportQuote('excel')" style="padding:10px 28px;border:1px solid #667eea;border-radius:8px;background:white;color:#667eea;font-size:14px;cursor:pointer;font-weight:500;">📥 导出 Excel</button>
+                                <button class="btn-action" onclick="exportQuote('pdf')" style="padding:10px 28px;border:none;border-radius:8px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;font-size:14px;cursor:pointer;font-weight:500;">📄 导出 PDF</button>
+                            </div>
+                        </div>
+                    `);
+                }, 1500);
+            }, 600);
+        }
+
+        function exportQuote(format) {
+            addUserMessage(`导出${format === 'pdf' ? 'PDF' : 'Excel'}格式报价单`);
+            setTimeout(() => {
+                addBotMessage(`✅ 报价单已导出为${format === 'pdf' ? 'PDF' : 'Excel'}格式，已保存到您的下载文件夹。`);
+            }, 500);
+        }
+
+        // ============ 发送消息 ============
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('inputText');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // 确保消息区域可见
+            document.getElementById('welcomePage').classList.add('hidden');
+            document.getElementById('messageArea').classList.remove('hidden');
+
+            // 检查快捷指令
+            if (text === '/报价') {
+                input.value = '';
+                startQuoteAssistant();
+                return;
+            }
+
+            // 检查意图 - 报价相关需求直接进入报价模式，不显示中间消息
+            if (handleIntentRecognition(text)) {
+                input.value = '';
+                startQuoteAssistant();
+                // 继续处理用户的原始消息
+                setTimeout(() => {
+                    const params = parseNaturalLanguage(text);
+                    if (Object.keys(params).some(k => params[k] !== null && params[k] !== '' && (Array.isArray(params[k]) ? params[k].length > 0 : true))) {
+                        parsedParams = { ...params };
+                        const parsedHtml = showParsedParams(params);
+                        if (parsedHtml) {
+                            addCardMessage(parsedHtml);
+                        }
+                    }
+                }, 300);
+                return;
+            }
+
+            // 普通聊天模式
+            addUserMessage(text);
+            input.value = '';
+            updateCharCount();
+
+            showThinking();
+            setTimeout(() => {
+                hideThinking();
+                addBotMessage('我已收到您的消息。对于报价相关需求，您可以点击左侧「智能报价」卡片，或输入「我要做报价」~');
+            }, 800);
+        }
+
+        // ============ 初始化 ============
+        window.onload = function() {
+            // 恢复侧边栏折叠状态
+            const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (collapsed) {
+                document.getElementById('sidebar').classList.add('collapsed');
+                document.getElementById('collapseBtn').textContent = '▶';
+            }
+
+            renderHistoryList();
+        };
+    </script>
+</body>
+</html>
